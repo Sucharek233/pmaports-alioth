@@ -3,9 +3,9 @@
 pkgname=device-xiaomi-alioth
 pkgdesc="Xiaomi Poco F3"
 pkgver=5
-pkgrel=2
+pkgrel=12
 url="https://postmarketos.org"
-license="MIT"
+license="MIT BSD-3-Clause"
 arch="aarch64"
 options="!check !archcheck"
 depends="
@@ -25,10 +25,25 @@ depends="
 	linux-firmware-qcom
 	linux-firmware-qca
 	linux-firmware-ath11k
-	tqftpserv
+	bash
+	bluez
+	iproute2
+	kmod
+	modemmanager=1.25.95_git20261005-r4
+	networkmanager
+	python3
+	qmi-utils
+	qrtr
+	qrtr-libs
+	zstd-libs
 "
 
-makedepends="devicepkg-dev"
+makedepends="
+	devicepkg-dev
+	meson
+	qrtr-dev
+	zstd-dev
+"
 source="
 	81-libssc-xiaomi-alioth.rules
     alsa-ucm-conf/alioth.conf
@@ -37,10 +52,39 @@ source="
 	hexagonrpcd.confd
 	modules-initfs
     wifi-powersave.conf
+	alioth-bluetooth-init.sh
+	alioth-bluetooth.service
+	bluetooth-modules.conf
+	modem-services/77-mm-ignore-sdx55-extra.rules
+	modem-services/77-mm-sdx55-qrtr.rules
+	modem-services/alioth-modem-firmware.service
+	modem-services/alioth-modem-firmware.sh
+	modem-services/alioth-modem.service
+	modem-services/alioth-sim-provision
+	modem-services/alioth-switch-sim
+	modem-services/data_up.py
+	modem-services/diagprobe.py
+	modem-services/efs_srv.py
+	modem-services/modem-modules.conf
+	modem-services/modem-up.sh
+	modem-services/sahara_srv.py
+	modem-services/tqftpserv.service
+	modem-services/alioth-sdx55.conf
+	https://github.com/linux-msm/tqftpserv/archive/v1.3/tqftpserv-v1.3.tar.gz
+	tqftpserv-alioth-qrtr-instance.diff
 "
+
+prepare() {
+	default_prepare
+	cd "$srcdir/tqftpserv-1.3"
+	patch -p1 -i "$srcdir/tqftpserv-alioth-qrtr-instance.diff"
+}
 
 build() {
 	devicepkg_build $startdir $pkgname
+	cd "$srcdir/tqftpserv-1.3"
+	abuild-meson . output
+	meson compile -C output
 }
 
 package() {
@@ -73,15 +117,77 @@ package() {
     # makes the device more responsive through ssh
     install -Dm644 "$srcdir/wifi-powersave.conf" \
         "$pkgdir/etc/NetworkManager/conf.d/wifi-powersave.conf"
+
+	install -Dm755 "$srcdir/alioth-bluetooth-init.sh" \
+		"$pkgdir/usr/bin/alioth-bluetooth-init.sh"
+	install -Dm644 "$srcdir/alioth-bluetooth.service" \
+		"$pkgdir/etc/systemd/system/alioth-bluetooth.service"
+	install -Dm644 "$srcdir/bluetooth-modules.conf" \
+		"$pkgdir/etc/modules-load.d/bluetooth.conf"
+
+	install -Dm755 "$srcdir/alioth-modem-firmware.sh" \
+		"$pkgdir/usr/bin/alioth-modem-firmware.sh"
+	install -Dm644 "$srcdir/alioth-modem-firmware.service" \
+		"$pkgdir/etc/systemd/system/alioth-modem-firmware.service"
+	install -Dm644 "$srcdir/alioth-modem.service" \
+		"$pkgdir/etc/systemd/system/alioth-modem.service"
+	install -Dm755 "$srcdir/tqftpserv-1.3/output/tqftpserv" \
+		"$pkgdir/usr/bin/tqftpserv"
+	install -Dm644 "$srcdir/tqftpserv-1.3/LICENSE" \
+		"$pkgdir/usr/share/licenses/$pkgname/tqftpserv-COPYING"
+	install -Dm644 "$srcdir/tqftpserv.service" \
+		"$pkgdir/etc/systemd/system/tqftpserv.service"
+	install -Dm644 "$srcdir/modem-modules.conf" \
+		"$pkgdir/etc/modules-load.d/modem.conf"
+	install -Dm644 "$srcdir/alioth-sdx55.conf" \
+		"$pkgdir/etc/modprobe.d/alioth-sdx55.conf"
+
+	for script in data_up.py diagprobe.py efs_srv.py sahara_srv.py; do
+		install -Dm755 "$srcdir/$script" \
+			"$pkgdir/usr/bin/$script"
+	done
+	for script in alioth-sim-provision alioth-switch-sim modem-up.sh; do
+		install -Dm755 "$srcdir/$script" \
+			"$pkgdir/usr/bin/$script"
+	done
+	install -Dm644 "$srcdir/77-mm-ignore-sdx55-extra.rules" \
+		"$pkgdir/etc/udev/rules.d/77-mm-ignore-sdx55-extra.rules"
+	install -Dm644 "$srcdir/77-mm-sdx55-qrtr.rules" \
+		"$pkgdir/etc/udev/rules.d/77-mm-sdx55-qrtr.rules"
+
+	mkdir -p "$pkgdir/etc/systemd/system/multi-user.target.wants"
+	for unit in alioth-bluetooth.service alioth-modem-firmware.service alioth-modem.service tqftpserv.service; do
+		ln -sfn "../$unit" "$pkgdir/etc/systemd/system/multi-user.target.wants/$unit"
+	done
 }
 
 
 sha512sums="
 2c16ba75e0077b2b1eaefa4c73b287475505a1aeb291ec29316d41cc094277320f9d2aaabfd91eb1dc0f488ab2d61a94faef16e7afe0f1e226779113761b9a37  81-libssc-xiaomi-alioth.rules
 8db13314073e15c45defa9d366e5d1a88d21f87491edea0d0242c370d248022acaef39b6cf74bfaaa45d474eb045ba8de2427c29095978f5f184dda1ae55d53b  alioth.conf
-44b9c58c54b691e33b8e7ed322694d2110ba52d58a0da3b8b94efe6091637c7f200dfa003bf287f826107851383ad7554fc9f606a6343272b9d8cd57ebdf240a  HiFi.conf
-d197c5bfd40d12f3f4df33bf8f79433aa3e6cc1fee41220a076484292ef49d501790cbce1a21aacbba3bdf979d0b64b14ee17417a58ffc160f9e3a30dc38c7f9  deviceinfo
+7e1ac8d01a948c1d60cb397e702872b679f650b04431e7d1a550fb618f2ed431efc04f1dec671c3b5d243d55b3699892256ea0676248e69e0f1c38f7c2001db0  HiFi.conf
+488c82182fcec168c4e263ba06bf331a21ba388e1428c6c141b3a6a2153a2ed235f4af729a434085f20af1db2886911951210d627d00de29bfd643e41425b211  deviceinfo
 dbf96453e5e398ed11f315069d6eedde0ada1f387bf42e3cc78fcd152e061db68f4c16ed1dc6169067ad65b5bc96c9a8ae9d5503bcb06a257445c9a12390f606  hexagonrpcd.confd
 5deb89ca95175e89feee7bb3dfedc1ecf156163d73db95784a5da363fc486ef2dbe46b7c2212ad451931be847d2ff8866bf620d86748806c4c093a7d07bab898  modules-initfs
 21676a9e1079f1b86b840b7c86a65c1cc960a458eb9e219a7a16029b92a9d2f1ecfc9c3ff18b0ec1c86f624fe6a435fecd3b1db0d3cd1a0f3c6c3cac78ab996f  wifi-powersave.conf
+f97f7f492eba610a7c4596d3ad6a9c52961435ff00dedc1a4b6961b3112a94e2e0e07e0f321172a111de517b064291158b7d5a8cc5e5b733bd6db8d172870617  alioth-bluetooth-init.sh
+b512bc2cb1a8602a116876dc3243f525ab99d4460067b7f68c6b8825e46b0e374723d4e4598a96f3ec41aab1feb1cee6a7610b2d4e0dded69cd6628271150ed1  alioth-bluetooth.service
+d56cd9bd4354caa1b96f938f698cd6a6515b105aed34bafb98ff0cf52b08712ce4803094e4f1232e57d9020a44c6cfd01c36e467598a1359101f51d68c515f32  bluetooth-modules.conf
+0510620cced157d0fe0b0e1a12b086f004da1b0bb35f7d94732e640f4918fbcca2f6ec432d3cb263772185e702886b3167e50be7170f1d44ebf2be6991c27223  77-mm-ignore-sdx55-extra.rules
+2692d0873894d6623ba7dc11214f4b723d663d756c6d933b980ff4c745aa453a8df41ca51cb7fd70adf1b2a9f8210dbebf8b71edd530d129da11b6662cebab98  77-mm-sdx55-qrtr.rules
+266e4bfdb5da908c5830c3a04c17ebd1d542836805b49db87e1a4aa90b74ab5e7ece7e8885b40f5ec74771ad904e89fb5fa89890c4777ff81dd847ea01203cb6  alioth-modem-firmware.service
+0852d4ad52074caacd2b58f48e95f30c0749201b954e88db38964045467cd4ea65c60466e0c50488bf97cf63f440dcda40ba5f8250ef005abb15d1f3ef73af0f  alioth-modem-firmware.sh
+52297b885d5e8b085511a619cebed3a1ed4d55d5db4b34d413536829b9497e51f4b0bfab83c72dfce21c93ffc6492ab7bedffb9a5db521711d15fb9df45bf017  alioth-modem.service
+09bff6eb5fbf0a2757c6eaaee8a4a2075418ef0b671420bf69dd5154d7f0853fad1e5c72d2def67265d61ce30a93ab53512333a5b65ee56f31d6562210bc0988  alioth-sim-provision
+b6bab975562d1cd609165044240115ed26189766e6477672cbfad30989c99275c416acd0904cc716b8db1ce03dc65dc924a0cb8f8d4bd2055c99358c60c0ccc5  alioth-switch-sim
+f96cde14a35c33a7fe9b7e504c2545774b0c20328591ca35f7782f17bd56e005b9fc0d346ee5a330d5bddbdcc3f645d231223f8f2ec851c1e032bd7cc5bdcba9  data_up.py
+ff9ca1e0f1dd38f01a7be2cb71e730310d96b451d229c244f615d84448d598a74ecac09b5128859d5900972a185ab12010edfc56895513f3bb730d7969e80d16  diagprobe.py
+922fab085d58153aa912f4ab32e523c3c88fbf568736718c2fe010819afd2d858fc0b17922946ad5d2ad1809c5a8e61051854b70e4af5e3466129ff5cd6416a4  efs_srv.py
+21ea8cae9f3aa4fd62f63771084ece604a12c92397986c1ce35ad54487612da6e1cd6d7eae9c18add1b98744ed914820631636007ab21681c21fe917e011e1b1  modem-modules.conf
+0d79460caedd477102546d6de6dbe05d47490719bbb74f433ec2ad59bbfc334cbc50fa358200d2a8fc6b6dac0e881add3bafe7e399527a370fbb90b9429710cf  modem-up.sh
+fdca01f2277c2f9740e827371a8c6edcec0f34715bc4061e25fecad67a3e4d268717f414fcaa8c1820a065dcee87fff92ce00c9045f27d61b0f843c6501a1f3d  sahara_srv.py
+4d44a61af511e8d41d355c31d71e3df72844f592b7bb1d22c67f219f5aa3f462e341c2bf2b5568c92308f40e22accf9ce03f0653a04770f028138ea40e9281d1  tqftpserv.service
+85629e600849a3517ea499c0d130e38908be00492e932721518fbe390769a2caed6b3b112184db33b9aa526efeb35343943e08cc85de1e3d581258a9d498e491  alioth-sdx55.conf
+1e43ef53633baf8b06132dc84bf8274ab9cf96c7d5c4c99b31d908f03ed6e90fc1a67ade76220ef2ed87eac8be50f5ac2de554ec3a604f026054ba6609364a74  tqftpserv-v1.3.tar.gz
+d1c39c77dc864546820b3367022a25f1fc42517cf1b9767813651b7db763aef165922641c006b8b4b521c7f4548c2afc5492c38f4873a5c0fc07ecbce7664c50  tqftpserv-alioth-qrtr-instance.diff
 "

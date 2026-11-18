@@ -1,0 +1,59 @@
+diff --git a/src/mm-bearer-qmi.c b/src/mm-bearer-qmi.c
+--- a/src/mm-bearer-qmi.c
++++ b/src/mm-bearer-qmi.c
+@@ -2442,6 +2442,7 @@ load_settings_from_bearer (MMBearerQmi         *self,
+         if (mm_context_get_test_multiplex_requested ())
+             ctx->multiplex = MM_BEARER_MULTIPLEX_SUPPORT_REQUESTED;
+-        else if (!g_strcmp0 (data_port_driver, "ipa"))
++        else if (!g_strcmp0 (data_port_driver, "ipa") ||
++                 !g_strcmp0 (data_port_driver, "mhi_net"))
+             ctx->multiplex = MM_BEARER_MULTIPLEX_SUPPORT_REQUIRED;
+         else
+             ctx->multiplex = MM_BEARER_MULTIPLEX_SUPPORT_NONE;
+diff --git a/src/mm-shared-qmi.c b/src/mm-shared-qmi.c
+--- a/src/mm-shared-qmi.c
++++ b/src/mm-shared-qmi.c
+@@ -3390,6 +3390,7 @@ uim_get_slot_status_ready (QmiClientUim *client,
+         return;
+     }
+ 
++    gboolean active_slot_has_card = FALSE;
+     ctx->sim_slots = g_ptr_array_new_full (physical_slots->len, (GDestroyNotify) sim_slot_free);
+ 
+     for (i = 0; i < physical_slots->len; i++) {
+@@ -3405,9 +3406,19 @@ uim_get_slot_status_ready (QmiClientUim *client,
+         /* Store active slot info */
+         slot_status = &g_array_index (physical_slots, QmiPhysicalSlotStatusSlot, i);
+         if (slot_status->physical_slot_status == QMI_UIM_SLOT_STATE_ACTIVE) {
++            gboolean has_card = (slot_status->iccid->len > 0);
++
+             sim_active = TRUE;
+-            ctx->active_logical_id = slot_status->logical_slot;
+-            ctx->active_slot_number = i + 1;
++            /* Both slots may be active; prefer the one holding a SIM, then
++             * the lowest logical slot to avoid changing the primary SIM. */
++            if (!ctx->active_slot_number ||
++                (has_card && !active_slot_has_card) ||
++                (has_card == active_slot_has_card &&
++                 slot_status->logical_slot < ctx->active_logical_id)) {
++                ctx->active_logical_id = slot_status->logical_slot;
++                ctx->active_slot_number = i + 1;
++                active_slot_has_card = has_card;
++            }
+         }
+ 
+         if (!slot_status->iccid->len) {
+diff --git a/src/plugins/qcom-soc/mm-broadband-modem-qmi-qcom-soc.c b/src/plugins/qcom-soc/mm-broadband-modem-qmi-qcom-soc.c
+--- a/src/plugins/qcom-soc/mm-broadband-modem-qmi-qcom-soc.c
++++ b/src/plugins/qcom-soc/mm-broadband-modem-qmi-qcom-soc.c
+@@ -131,6 +131,10 @@ peek_port_qmi_for_data (MMBroadbandModemQmi  *self,
+     if (g_strcmp0 (net_port_driver, "bam-dmux") == 0)
+         return peek_port_qmi_for_data_bam_dmux (self, data, out_endpoint, error);
+ 
++    if (g_strcmp0 (net_port_driver, "mhi_net") == 0 ||
++        g_strcmp0 (net_port_driver, "rmnet") == 0)
++        return peek_port_qmi_for_data_ipa (self, data, out_endpoint, error);
++
+     g_set_error (error,
+                  MM_CORE_ERROR,
+                  MM_CORE_ERROR_FAILED,

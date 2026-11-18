@@ -39,11 +39,15 @@ modprobe mhi_net
 modprobe rmnet
 
 log "starting firmware servers"
-setsid python3 -u /usr/local/bin/sahara_srv.py >> "$LOG" 2>&1 &
-setsid python3 -u /usr/local/bin/efs_srv.py    >> "$LOG" 2>&1 &
+setsid python3 -u /usr/bin/sahara_srv.py >> "$LOG" 2>&1 &
+setsid python3 -u /usr/bin/efs_srv.py    >> "$LOG" 2>&1 &
 sleep 1
 
 log "powering the modem up"
+[ -s /lib/firmware/qcom/sdx55m/sbl1.mbn ] || {
+    log "required firmware sbl1.mbn is missing; check alioth-modem-firmware.service"
+    exit 1
+}
 modprobe mhi_pci_generic sdx_health=0 sdx_rpm=0
 
 for i in $(seq 1 90); do
@@ -120,7 +124,7 @@ if [ "${MODEM_SELF_DATA:-$((1 - MM_PATCHED))}" = "1" ]; then
     ip link set rmnet0 up mtu 1500
 
     log "starting the data session"
-    setsid python3 -u /usr/local/bin/data_up.py "$APN" "$APN_USER" "$APN_PASS" \
+    setsid python3 -u /usr/bin/data_up.py "$APN" "$APN_USER" "$APN_PASS" \
             $EP_IFACE $MUX_ID $EP_TYPE >> "$LOG" 2>&1 &
 
     for i in $(seq 1 40); do

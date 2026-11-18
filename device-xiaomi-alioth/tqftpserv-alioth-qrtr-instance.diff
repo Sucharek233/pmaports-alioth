@@ -1,0 +1,5 @@
+--- a/tqftpserv.c
++++ b/tqftpserv.c
+@@ -965,1 +965,1 @@
+-	ret = qrtr_publish(fd, 4096, 1, 0);
++	ret = qrtr_publish(fd, 4096, 3, 0);

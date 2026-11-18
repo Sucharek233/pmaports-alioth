@@ -5,7 +5,7 @@ Wants=bluetooth.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/alioth-bluetooth-init.sh
+ExecStart=/usr/bin/alioth-bluetooth-init.sh
 RemainAfterExit=yes
 
 [Install]

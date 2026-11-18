@@ -30,6 +30,9 @@ pmaports-alioth/
 ├── firmware-xiaomi-alioth/            # Non-free firmware package
 │   ├── APKBUILD                      # Firmware extraction & packaging
 │   └── *.files                       # Lists of firmware files for initramfs & sensors
+├── modemmanager/                     # Alioth-specific Alpine ModemManager override
+│   ├── APKBUILD                      # ModemManager source and package definition
+│   └── *.patch                       # SDX55/QMI compatibility fixes
 ├── docs/                             # Structured documentation
 │   ├── user/                         # End-user guides (installation, dualboot, config)
 │   └── dev/                          # Developer technical docs (kernel, modem, uart, dts)
@@ -48,7 +51,7 @@ pmaports-alioth/
 
 ### 3.1. Synchronizing with pmbootstrap Cache
 
-The three packaging directories (`device-xiaomi-alioth`, `firmware-xiaomi-alioth`, `linux-postmarketos-qcom-sm8250-alioth`) live inside the local `pmbootstrap` ports tree under `~/.local/var/pmbootstrap/cache_git/pmaports/device/testing/`.
+The device, firmware, kernel, and ModemManager packaging directories live inside the local `pmbootstrap` ports tree under `~/.local/var/pmbootstrap/cache_git/pmaports/device/testing/`.
 
 - **Push changes to pmbootstrap**:
   ```sh
@@ -80,7 +83,9 @@ pmbootstrap checksum linux-postmarketos-qcom-sm8250-alioth
 # 4. Build packages
 pmbootstrap build firmware-xiaomi-alioth
 pmbootstrap build --lax linux-postmarketos-qcom-sm8250-alioth
+pmbootstrap build modemmanager
 pmbootstrap build device-xiaomi-alioth
+pmbootstrap install --password 147147
 ```
 
 ### 3.3. Fedora Rootfs Provisioning

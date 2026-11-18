@@ -1,10 +1,25 @@
 #!/bin/sh
+set -eu
 
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+PMAPORTS="$HOME/.local/var/pmbootstrap/cache_git/pmaports/device/testing"
 
-rm -rf /home/agata/pmaports-alioth/device-xiaomi-alioth /home/agata/pmaports-alioth/firmware-xiaomi-alioth /home/agata/pmaports-alioth/linux-postmarketos-qcom-sm8250-alioth
+set -- \
+	linux-postmarketos-qcom-sm8250-alioth \
+	device-xiaomi-alioth \
+	firmware-xiaomi-alioth \
+	modemmanager
 
-cp -r ~/.local/var/pmbootstrap/cache_git/pmaports/device/testing/linux-postmarketos-qcom-sm8250-alioth /home/agata/pmaports-alioth/linux-postmarketos-qcom-sm8250-alioth
-cp -r ~/.local/var/pmbootstrap/cache_git/pmaports/device/testing/device-xiaomi-alioth /home/agata/pmaports-alioth/device-xiaomi-alioth
-cp -r ~/.local/var/pmbootstrap/cache_git/pmaports/device/testing/firmware-xiaomi-alioth /home/agata/pmaports-alioth/firmware-xiaomi-alioth
+for package do
+	if [ ! -d "$PMAPORTS/$package" ]; then
+		echo "Package directory not found in pmbootstrap cache: $PMAPORTS/$package" >&2
+		exit 1
+	fi
+done
 
-echo "Folders replaced in the repo"
+for package do
+	rm -rf -- "$SCRIPT_DIR/$package"
+	cp -a "$PMAPORTS/$package" "$SCRIPT_DIR/$package"
+done
+
+echo "Updated repository package directories"

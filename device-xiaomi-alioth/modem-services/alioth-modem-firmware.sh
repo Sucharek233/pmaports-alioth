@@ -17,7 +17,7 @@ part () {
     fi
 }
 
-[ -s "$FW/qdsp6sw.mbn" ] || {
+[ -s "$FW/qdsp6sw.mbn" ] && [ -s "$FW/sbl1.mbn" ] || {
 	mkdir -p /mnt/modem "$FW" "$RPROC_FW"
 	# vfat, and without -t the mount ends up guessing fuseblk and fails
 	mount -t vfat -o ro "$(part modem_a)" /mnt/modem
@@ -71,7 +71,9 @@ SNS=/usr/share/qcom/sm8250/xiaomi/alioth
 	done
 
 # Ensure prebuilt RPM packages (e.g. patched ModemManager) are cleanly installed
-if compgen -G "/var/cache/rpms/*.rpm" > /dev/null; then
+if command -v rpm >/dev/null 2>&1 &&
+	command -v compgen >/dev/null 2>&1 &&
+	compgen -G "/var/cache/rpms/*.rpm" > /dev/null; then
 	echo "Installing prebuilt custom RPMs..."
 	rpm -Uvh --nodeps --nosignature --replacepkgs --replacefiles /var/cache/rpms/*.rpm >/dev/null 2>&1 || true
 fi

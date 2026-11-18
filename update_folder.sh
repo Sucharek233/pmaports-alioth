@@ -1,11 +1,27 @@
 #!/bin/sh
+set -eu
 
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+PMAPORTS="$HOME/.local/var/pmbootstrap/cache_git/pmaports/device/testing"
 
-rm -rf ~/.local/var/pmbootstrap/cache_git/pmaports/device/testing/linux-postmarketos-qcom-sm8250-alioth ~/.local/var/pmbootstrap/cache_git/pmaports/device/testing/device-xiaomi-alioth ~/.local/var/pmbootstrap/cache_git/pmaports/device/testing/firmware-xiaomi-alioth
+mkdir -p "$PMAPORTS"
 
+set -- \
+	linux-postmarketos-qcom-sm8250-alioth \
+	device-xiaomi-alioth \
+	firmware-xiaomi-alioth \
+	modemmanager
 
-cp -r /home/agata/pmaports-alioth/linux-postmarketos-qcom-sm8250-alioth ~/.local/var/pmbootstrap/cache_git/pmaports/device/testing/linux-postmarketos-qcom-sm8250-alioth 
-cp -r /home/agata/pmaports-alioth/device-xiaomi-alioth ~/.local/var/pmbootstrap/cache_git/pmaports/device/testing/device-xiaomi-alioth
-cp -r /home/agata/pmaports-alioth/firmware-xiaomi-alioth ~/.local/var/pmbootstrap/cache_git/pmaports/device/testing/firmware-xiaomi-alioth
+for package do
+	if [ ! -d "$SCRIPT_DIR/$package" ]; then
+		echo "Package directory not found: $SCRIPT_DIR/$package" >&2
+		exit 1
+	fi
+done
 
-echo "Updated folder on the computer"
+for package do
+	rm -rf -- "$PMAPORTS/$package"
+	cp -a "$SCRIPT_DIR/$package" "$PMAPORTS/$package"
+done
+
+echo "Updated pmbootstrap package cache"
